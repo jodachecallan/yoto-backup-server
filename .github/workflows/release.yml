@@ -10,9 +10,8 @@ name: Build and attach release executables
 #     and attaches the executables to that release.
 # Either way, PyInstaller builds a native package per OS, each on its own
 # OS-native runner (PyInstaller does not cross-compile): a Windows .exe, a
-# Linux single-binary tarball, and a macOS .app bundled into a .dmg. The
-# Windows .exe matches how every previous release's .exe was built by hand;
-# the Linux and macOS builds are new.
+# Linux single-binary tarball, and a macOS .app bundled into a .dmg.
+# Builds run in this repository and attach the files to its GitHub Release.
 on:
   push:
     tags:
@@ -68,10 +67,12 @@ jobs:
             suffix: ""
             ext: ".exe"
             icon_args: --icon=YJE.ico
+            data_sep: ";"
           - os: ubuntu-latest
             suffix: "_linux"
             ext: ".tar.gz"
             icon_args: ""
+            data_sep: ":"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -79,12 +80,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
-      - name: Install Tk (Linux runner only)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-tk
 
       - name: Install dependencies
         shell: bash
@@ -106,11 +101,16 @@ jobs:
           fi
 
       - name: Build executable
+        # No --windowed: the app is a local server, and the console is how
+        # you stop it. Static files are unpacked beside the executable at
+        # runtime (sys._MEIPASS/static).
         shell: bash
         run: |
-          pyinstaller --onefile --windowed ${{ matrix.icon_args }} \
-            --name "Yoto_Json_Extractor_${{ steps.tag.outputs.tag }}${{ matrix.suffix }}" \
-            YOTO.py
+          pyinstaller --onefile ${{ matrix.icon_args }} \
+            --add-data "static${{ matrix.data_sep }}static" \
+            --collect-submodules uvicorn \
+            --name "yoto-backup-server_${{ steps.tag.outputs.tag }}${{ matrix.suffix }}" \
+            yoto-backup-server.py
 
       - name: Package as tar.gz (Linux only)
         # A bare Unix executable with no extension is normal (ls, git,
@@ -123,7 +123,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         shell: bash
         run: |
-          name="Yoto_Json_Extractor_${{ steps.tag.outputs.tag }}${{ matrix.suffix }}"
+          name="yoto-backup-server_${{ steps.tag.outputs.tag }}${{ matrix.suffix }}"
           chmod +x "dist/$name"
           tar -czf "dist/$name.tar.gz" -C dist "$name"
 
@@ -133,7 +133,7 @@ jobs:
         shell: bash
         run: |
           gh release upload "${{ steps.tag.outputs.tag }}" \
-            "dist/Yoto_Json_Extractor_${{ steps.tag.outputs.tag }}${{ matrix.suffix }}${{ matrix.ext }}" \
+            "dist/yoto-backup-server_${{ steps.tag.outputs.tag }}${{ matrix.suffix }}${{ matrix.ext }}" \
             --repo "${{ github.repository }}" \
             --clobber
 
@@ -171,26 +171,28 @@ jobs:
         # alone makes PyInstaller emit a proper dist/<name>.app bundle.
         run: |
           pyinstaller --windowed \
-            --name "Yoto Json Extractor" \
-            YOTO.py
+            --add-data "static:static" \
+            --collect-submodules uvicorn \
+            --name "Yoto Backup" \
+            yoto-backup-server.py
 
       - name: Package .dmg
         run: |
-          app="dist/Yoto Json Extractor.app"
+          app="dist/Yoto Backup.app"
           staging="dmg_staging"
           mkdir "$staging"
           cp -R "$app" "$staging/"
           ln -s /Applications "$staging/Applications"
-          hdiutil create -volname "Yoto Json Extractor" \
+          hdiutil create -volname "Yoto Backup" \
             -srcfolder "$staging" \
             -ov -format UDZO \
-            "dist/Yoto_Json_Extractor_${{ steps.tag.outputs.tag }}_macos.dmg"
+            "dist/yoto-backup-server_${{ steps.tag.outputs.tag }}_macos.dmg"
 
       - name: Upload .dmg to the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload "${{ steps.tag.outputs.tag }}" \
-            "dist/Yoto_Json_Extractor_${{ steps.tag.outputs.tag }}_macos.dmg" \
+            "dist/yoto-backup-server_${{ steps.tag.outputs.tag }}_macos.dmg" \
             --repo "${{ github.repository }}" \
             --clobber

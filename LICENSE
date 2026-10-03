@@ -1,6 +1,7 @@
 MIT License
 
 Copyright (c) 2024 Alberto Fernández
+Copyright (c) 2026 Jodache Callan Naidoo
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +20,23 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+What this license covers
+
+The MIT License above applies to the application source code, documentation,
+and original files in this repository.
+
+It does not apply to:
+
+- Yoto card content downloaded with this app, including audio, covers, track
+  icons, and card metadata. That material belongs to its owners. This app is
+  for keeping a copy of cards you are allowed to store.
+- The Yoto name, trademarks, and card artwork.
+- Third-party Python packages installed from requirements.txt. Those packages
+  keep their own licenses.
+- The font files in static/fonts/. Inter (Copyright 2016 The Inter Project
+  Authors) and Nunito (Copyright 2014 The Nunito Project Authors) are licensed
+  under the SIL Open Font License, Version 1.1. The license text is in
+  static/fonts/OFL.txt.
