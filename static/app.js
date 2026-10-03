@@ -90,6 +90,34 @@ function coverMarkup(card, className) {
   return `<img class="${className}" alt="" src="${src}" onerror="this.outerHTML='<div class=&quot;${className} cover-fallback&quot; aria-hidden=&quot;true&quot;>${letter}</div>'">`;
 }
 
+const ACCENTS = ["blue", "green", "purple", "coral", "yellow", "peach"];
+
+const ICON_AUDIO = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V6l10-2v12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="7" cy="18" r="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="17" cy="16" r="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>`;
+const ICON_CHECK = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 9.2 17 19 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const ICON_ALERT = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.5 3.5 19.5h17L12 4.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 10v4.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="16.8" r="0.8" fill="currentColor"/></svg>`;
+const ICON_SEARCH = `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16 16.5 20 20.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`;
+
+function accentFor(category) {
+  let total = 0;
+  for (const char of category) total += char.charCodeAt(0);
+  return ACCENTS[total % ACCENTS.length];
+}
+
+function backupMarkup(card) {
+  if (card.backedUp) {
+    return `<span class="status status-ok">${ICON_CHECK}Backed up</span>`;
+  }
+  return `<span class="status status-warn">${ICON_ALERT}Needs a backup</span>`;
+}
+
+function backupSummary(list) {
+  const backed = list.filter((card) => card.backedUp).length;
+  const needs = list.length - backed;
+  const parts = [`${backed} backed up`];
+  if (needs) parts.push(`${needs} ${needs === 1 ? "needs" : "need"} a backup`);
+  return parts.join(" · ");
+}
+
 function uniqueValues(cards, field) {
   const values = new Set();
   cards.forEach((card) => {
@@ -125,24 +153,55 @@ function renderLibrary() {
   const categoryOptions = [`<option value="">All categories</option>`]
     .concat(categories.map((category) => `<option value="${escapeHtml(category)}"${category === state.category ? " selected" : ""}>${escapeHtml(category)}</option>`))
     .join("");
-  const tiles = matched.map((card) => `
+  const tiles = matched.map((card) => {
+    const category = (card.category || "").trim();
+    const badge = category
+      ? `<span class="badge ${accentFor(category)}">${escapeHtml(category)}</span>`
+      : "";
+    const duration = card.readableDuration
+      ? `<span class="muted">${escapeHtml(card.readableDuration)}</span>`
+      : "";
+    return `
     <button type="button" class="card-tile" data-id="${escapeHtml(card.cardId)}">
       <span class="cover-frame">${coverMarkup(card, "cover")}</span>
       <span class="tile-meta">
         <strong>${escapeHtml(card.title)}</strong>
-        <span>${escapeHtml(card.author || "Unknown author")}</span>
+        <span class="author">${escapeHtml(card.author || "Unknown author")}</span>
+        <span class="meta-row">
+          <span class="audio-mark">${ICON_AUDIO}Audio</span>
+          ${duration}
+          ${badge}
+        </span>
+        ${backupMarkup(card)}
       </span>
-    </button>`).join("");
+    </button>`;
+  }).join("");
   const countLabel = matched.length === cards.length
     ? `${cards.length} ${cards.length === 1 ? "card" : "cards"}`
     : `${matched.length} of ${cards.length}`;
+  const chips = categories.length > 0 && categories.length <= 8
+    ? `<div class="chips" role="group" aria-label="Category">${
+      [`<button type="button" class="chip${state.category ? "" : " is-selected"}" data-category="" aria-pressed="${state.category ? "false" : "true"}">All</button>`]
+        .concat(categories.map((category) => `<button type="button" class="chip${category === state.category ? " is-selected" : ""}" data-category="${escapeHtml(category)}" aria-pressed="${category === state.category ? "true" : "false"}">${escapeHtml(category)}</button>`))
+        .join("")
+    }</div>`
+    : "";
   view.innerHTML = `
-    <div class="toolbar"><h2>Library</h2><p class="muted" id="library-count">${countLabel}</p></div>
+    <div class="toolbar">
+      <div>
+        <h2>Your library</h2>
+        <p class="library-stats" id="library-count">${countLabel} · ${backupSummary(matched)}</p>
+      </div>
+    </div>
     <div class="filters">
-      <input id="library-search" type="search" placeholder="Title, author, or track" value="${escapeHtml(state.query)}" aria-label="Search the library">
+      <label class="search-field">
+        <input id="library-search" type="search" placeholder="Search your stories…" value="${escapeHtml(state.query)}" aria-label="Search the library">
+        ${ICON_SEARCH}
+      </label>
       <select id="library-author" aria-label="Filter by author">${authorOptions}</select>
       <select id="library-category" aria-label="Filter by category">${categoryOptions}</select>
     </div>
+    ${chips}
     ${matched.length
       ? `<div class="grid">${tiles}</div>`
       : `<p class="muted">No cards match.</p>`}`;
@@ -163,13 +222,19 @@ function renderLibrary() {
     state.category = event.target.value;
     renderLibrary();
   });
+  view.querySelectorAll(".chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      state.category = chip.dataset.category || "";
+      renderLibrary();
+    });
+  });
   view.querySelectorAll(".card-tile").forEach((tile) => {
     tile.addEventListener("click", () => openCard(tile.dataset.id));
   });
 }
 
 async function loadLibrary() {
-  view.innerHTML = `<div class="toolbar"><h2>Library</h2></div>`;
+  view.innerHTML = `<div class="toolbar"><h2>Your library</h2><p class="muted">Loading your library…</p></div>`;
   try {
     state.cards = await api("/api/cards");
     if (!state.cards.length) {
@@ -178,9 +243,11 @@ async function loadLibrary() {
       state.category = "";
       view.innerHTML = `
         <section class="empty">
-          <h2>No cards yet</h2>
-          <p class="muted">Add a Yoto URL and the card will show up here. A zip copy is written to your backup folder.</p>
+          <h2>Your library is empty</h2>
+          <p>Add your first card to start building your backup library.</p>
+          <button type="button" class="primary" id="empty-add">Add card</button>
         </section>`;
+      document.querySelector("#empty-add").addEventListener("click", () => show("add"));
       return;
     }
     renderLibrary();
@@ -195,6 +262,7 @@ async function openCard(cardId) {
   try {
     const card = await api(`/api/cards/${encodeURIComponent(cardId)}`);
     const facts = [
+      "Audio",
       card.author,
       card.category,
       card.readableDuration,

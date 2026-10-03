@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import threading
 import uuid
 from contextlib import asynccontextmanager
@@ -43,8 +44,30 @@ def _track_titles(card):
     return titles
 
 
+_ZIP_CARD_ID = re.compile(r"\[([^\[\]]+)\]\s*\(")
+
+
+def _backed_up_ids(backup_dir):
+    found = set()
+    if not backup_dir or not os.path.isdir(backup_dir):
+        return found
+    try:
+        names = os.listdir(backup_dir)
+    except OSError:
+        return found
+    for name in names:
+        if not name.lower().endswith(".zip"):
+            continue
+        match = _ZIP_CARD_ID.search(name)
+        if match:
+            found.add(match.group(1))
+    return found
+
+
 def list_cards():
-    library = config.load_config()["library_dir"]
+    settings = config.load_config()
+    library = settings["library_dir"]
+    backed_up = _backed_up_ids(settings.get("backup_dir"))
     cards = []
     if not os.path.isdir(library):
         return cards
@@ -70,6 +93,7 @@ def list_cards():
             "trackCount": card.get("trackCount") or 0,
             "readableDuration": card.get("readableDuration"),
             "cover": card.get("cover"),
+            "backedUp": card["cardId"] in backed_up,
         })
     cards.sort(key=lambda item: item["title"].casefold())
     return cards
