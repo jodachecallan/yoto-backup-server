@@ -68,10 +68,12 @@ jobs:
             suffix: ""
             ext: ".exe"
             icon_args: --icon=YJE.ico
+            data_sep: ";"
           - os: ubuntu-latest
             suffix: "_linux"
             ext: ".tar.gz"
             icon_args: ""
+            data_sep: ":"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -79,12 +81,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
-      - name: Install Tk (Linux runner only)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y python3-tk
 
       - name: Install dependencies
         shell: bash
@@ -106,9 +102,14 @@ jobs:
           fi
 
       - name: Build executable
+        # No --windowed: the app is a local server, and the console is how
+        # you stop it. Static files are unpacked beside the executable at
+        # runtime (sys._MEIPASS/static).
         shell: bash
         run: |
-          pyinstaller --onefile --windowed ${{ matrix.icon_args }} \
+          pyinstaller --onefile ${{ matrix.icon_args }} \
+            --add-data "static${{ matrix.data_sep }}static" \
+            --collect-submodules uvicorn \
             --name "Yoto_Json_Extractor_${{ steps.tag.outputs.tag }}${{ matrix.suffix }}" \
             YOTO.py
 
@@ -171,6 +172,8 @@ jobs:
         # alone makes PyInstaller emit a proper dist/<name>.app bundle.
         run: |
           pyinstaller --windowed \
+            --add-data "static:static" \
+            --collect-submodules uvicorn \
             --name "Yoto Json Extractor" \
             YOTO.py
 

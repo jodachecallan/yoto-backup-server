@@ -2,7 +2,7 @@
 
 ![Latest Release](https://img.shields.io/github/v/release/afsenovilla/YOTO-json-extractor) ![Code Size](https://img.shields.io/github/languages/code-size/afsenovilla/YOTO-json-extractor) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg) ![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue.svg)
 
-**Yoto JSON Extractor** is a Python-based tool that helps you download and process JSON data from Yoto URLs. It extracts and compress audio files and images, and embeds metadata into audio files for easier management of Yoto card content.
+**Yoto JSON Extractor** is a local web app that downloads Yoto cards from their URLs. Each card is kept as a folder you can browse — cover, audio, and track list — and a zip copy is written to a separate backup folder.
 
 > 🛠️ **v1.3.0 maintenance note:** the app and its design are entirely [@afsenovilla](https://github.com/afsenovilla)'s work. This release's dependency updates, bug fixes, and the automated multi-platform build workflow were done with the help of Claude.
 
@@ -10,11 +10,10 @@
 
 ## ✨ Features
 
-- **Extracts JSON**: Downloads and processes information from multiple Yoto URLs at once.
-- **Audio and Image Downloading**: Downloads audio files (AAC/MP3) and their associated images.
-- **Metadata Embedding**: Automatically embeds metadata such as title, track, album, artist and genre into audio files.
-- **Automated Management**: Organizes downloaded cards into respective compressed folders with audio and images.
-- **Automatic Cleanup**: Deletes the folders and JSON files after the extraction process.
+- **Card library**: Browse downloaded cards by cover, with the author and the track list.
+- **Batch download**: Paste one or more Yoto URLs and download them in one run.
+- **Audio and images**: Saves the audio files (AAC/MP3 and the other formats Yoto serves) and the cover and track icons.
+- **Backups**: Writes a zip copy of each card to a folder you choose, separate from the library. The library files stay in place.
 
 ---
 
@@ -25,7 +24,7 @@ A **compiled version** of the YOTO JSON Extractor is available as an executable 
 
 #### **Benefits of the Executable Version:**
 - **No Installation Required:** Users can run the application without needing to install Python or any dependencies.
-- **User-Friendly:** Simply double-click the executable file to start using the tool, making it accessible for all users.
+- **Opens in the browser:** The executable starts a local page on this computer and opens it for you. Closing the console window stops the app.
 
 To get started with the executable version, just download the `.exe` file from the [Releases](https://github.com/afsenovilla/YOTO-json-extractor/releases) section and double-click to run!
 
@@ -58,9 +57,7 @@ This project requires the following Python libraries:
 
 - **requests**: For handling HTTP requests to download JSON and media.
 - **beautifulsoup4**: To parse HTML and extract relevant data.
-- **mutagen**: For embedding metadata into audio files (supports AAC and MP3).
-- **customtkinter**: For creating a modern graphical user interface (GUI).
-- **py7zr**: For handling compressed files in `.7z` format.
+- **fastapi** and **uvicorn**: To serve the local library page in your browser.
 
 ---
 
@@ -72,9 +69,12 @@ This project requires the following Python libraries:
    python YOTO.py
    ```
 
-2. Input one or multiple YOTO URLs into the text area.
-3. Click the "Extract files" button to start the download and processing.
-4. The processed files and folders will be saved and the compressed in the directory of your choice.
+   This starts a page on this computer only (`127.0.0.1`) and opens it in your browser. Closing the terminal stops the app.
+
+2. In **Settings**, choose a library folder and a different backup folder. On the first run these default to `library` and `backups` next to the app.
+3. Open **Add cards**, paste one or more Yoto URLs (one per line), and download.
+4. Each card is stored as `library/<card id>/` with `card.json`, the cover, `audio/`, and `images/`. A zip of that folder is written to the backup folder. Downloading the same card again replaces its library folder and writes a new dated zip.
+5. The backup folder also holds `recovery.json`: the card id, title, and Yoto URL for every card saved. That list is what you use to download the library again if the card files are lost. A card stays on the list even if you later remove its folder.
 
 ---
 
@@ -88,13 +88,13 @@ To extract the URL from a physical YOTO card, you'll need a smartphone and the *
 2. Open the app and touch the **Scan & Launch** button.
 2. Tap the YOTO card against the NFC reader on your smartphone.
 3. The app will read the NFC tag and display the URL associated with the YOTO card.
-4. Copy the URL and paste it in the **YOTO JSON Extractor**.
+4. Copy the URL and paste it in **Add cards**.
 
 ### 2. What should I do if the download fails?
 Ensure that the provided YOTO URL is correct. If the issue persists, check your internet connection.
 
 ### 3. Can I process multiple URLs at once?
-Yes! You can input multiple YOTO URLs separated by new lines in the **YOTO JSON Extractor** and process them in batches.
+Yes. Paste multiple Yoto URLs in **Add cards**, one per line, and download them in one run.
 
 ### 4. What file formats are supported?
 The tool currently supports downloading audio files in **AAC** or **MP3** format, depending on what’s available in the YOTO JSON data.
