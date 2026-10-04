@@ -7,6 +7,7 @@ import shutil
 import tempfile
 import zipfile
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -123,6 +124,55 @@ def ensure_https(url):
     if not url.startswith("http://") and not url.startswith("https://"):
         return "https://" + url
     return url
+
+
+def card_id_from_url(url):
+    parsed = urlparse(ensure_https((url or "").strip()))
+    host = (parsed.hostname or "").lower()
+    if host not in {"yoto.io", "www.yoto.io"}:
+        return None
+    parts = [part for part in parsed.path.split("/") if part]
+    if len(parts) != 1:
+        return None
+    card_id = clean_filename(parts[0])
+    if card_id in ("", ".", ".."):
+        return None
+    return card_id
+
+
+def dedupe_urls(urls):
+    cleaned = []
+    seen = set()
+    for url in urls:
+        text = (url or "").strip()
+        if not text:
+            continue
+        card_id = card_id_from_url(text)
+        if card_id is not None:
+            if card_id in seen:
+                continue
+            seen.add(card_id)
+        cleaned.append(text)
+    return cleaned
+
+
+def library_has_card(library_dir, card_id):
+    if not card_id or os.path.basename(card_id) != card_id or card_id.startswith("."):
+        return False
+    return os.path.isdir(os.path.join(library_dir, card_id))
+
+
+def existing_card_result(library_dir, card_id, url):
+    title = card_id
+    path = os.path.join(library_dir, card_id, "card.json")
+    try:
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+        if isinstance(data, dict) and data.get("title"):
+            title = str(data["title"])
+    except (OSError, json.JSONDecodeError):
+        pass
+    return {"skipped": True, "cardId": card_id, "title": title, "url": url}
 
 
 def parse_card(html):
@@ -458,7 +508,7 @@ def save_card(card, source_url, library_dir, backup_dir, on_event=None):
             shutil.rmtree(staging, ignore_errors=True)
 
 
-def extract_one(url, library_dir, backup_dir, attempt, on_event=None):
+def extract_one(url, library_dir, backup_dir, attempt, on_event=None, replace_existing=False):
     if attempt >= MAX_ATTEMPTS:
         raise ExtractFail("URL has been tried 10 times and not able to complete.")
     _log(on_event, "info", f"Attempt {attempt} for {url}")
@@ -470,6 +520,10 @@ def extract_one(url, library_dir, backup_dir, attempt, on_event=None):
     if response.status_code != 200:
         raise ExtractFail(f"Failed to access the URL: {response.status_code}")
     card = parse_card(response.text)
+    if not replace_existing:
+        card_id = _safe_card_id(_text(card.get("cardId")), _text(card.get("title")) or "")
+        if library_has_card(library_dir, card_id):
+            return existing_card_result(library_dir, card_id, url)
     try:
         return save_card(card, url, library_dir, backup_dir, on_event)
     except ExtractFail:
@@ -480,13 +534,9 @@ def extract_one(url, library_dir, backup_dir, attempt, on_event=None):
         raise ExtractRetry(str(ex)) from ex
 
 
-def extract_urls(urls, library_dir, backup_dir, on_event=None):
+def extract_urls(urls, library_dir, backup_dir, on_event=None, replace_existing=False):
     """Download each URL. Per-URL failures are reported and do not stop the batch."""
-    cleaned = []
-    for url in urls:
-        text = (url or "").strip()
-        if text:
-            cleaned.append(text)
+    cleaned = dedupe_urls(urls)
 
     total = len(cleaned)
     _log(on_event, "info", f"Found {total} URLs.")
@@ -494,6 +544,28 @@ def extract_urls(urls, library_dir, backup_dir, on_event=None):
     attempts = 0
     while index < total:
         url = cleaned[index]
+        card_id = card_id_from_url(url)
+        if not replace_existing and card_id and library_has_card(library_dir, card_id):
+            result = existing_card_result(library_dir, card_id, url)
+            _log(on_event, "info", f"Already in the library: {result['title']}")
+            _emit(
+                on_event,
+                type="result",
+                status="skipped",
+                cardId=result["cardId"],
+                title=result["title"],
+                url=url,
+            )
+            index += 1
+            _emit(
+                on_event,
+                type="status",
+                index=index,
+                total=total,
+                url="",
+                finished=index,
+            )
+            continue
         attempts += 1
         _emit(
             on_event,
@@ -504,7 +576,9 @@ def extract_urls(urls, library_dir, backup_dir, on_event=None):
             finished=index,
         )
         try:
-            result = extract_one(url, library_dir, backup_dir, attempts, on_event)
+            result = extract_one(
+                url, library_dir, backup_dir, attempts, on_event, replace_existing
+            )
         except ExtractRetry as ex:
             _log(on_event, "error", f"Will retry {url}: {ex}")
             continue
@@ -515,8 +589,19 @@ def extract_urls(urls, library_dir, backup_dir, on_event=None):
             _log(on_event, "error", f"Failed {url}: {ex}")
             _emit(on_event, type="result", status="fail", url=url, error=str(ex))
         else:
-            _log(on_event, "info", f"Saved {result['title']}")
-            _emit(on_event, type="result", status="ok", **result)
+            if result.get("skipped"):
+                _log(on_event, "info", f"Already in the library: {result['title']}")
+                _emit(
+                    on_event,
+                    type="result",
+                    status="skipped",
+                    cardId=result["cardId"],
+                    title=result["title"],
+                    url=result["url"],
+                )
+            else:
+                _log(on_event, "info", f"Saved {result['title']}")
+                _emit(on_event, type="result", status="ok", **result)
         attempts = 0
         index += 1
         _emit(

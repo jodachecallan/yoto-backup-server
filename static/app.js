@@ -306,7 +306,8 @@ function renderJob(job) {
   }).join("");
   const succeeded = (job.succeeded || []).map((item) => `<p class="ok">${escapeHtml(item.title)} saved</p>`).join("");
   const failed = (job.failed || []).map((item) => `<p class="bad">${escapeHtml(item.url)} — ${escapeHtml(item.error)}</p>`).join("");
-  const summary = job.status === "done" ? `<div class="summary">${succeeded}${failed}</div>` : "";
+  const skipped = (job.skipped || []).map((item) => `<p class="muted">${escapeHtml(item.title)} already in the library</p>`).join("");
+  const summary = job.status === "done" ? `<div class="summary">${succeeded}${skipped}${failed}</div>` : "";
   const status = job.status === "running"
     ? `Downloading ${Math.min(finished + 1, total)} of ${total}`
     : "Finished";
@@ -328,6 +329,10 @@ async function loadAdd() {
           <label for="urls">Yoto URLs</label>
           <textarea id="urls" name="urls" placeholder="https://yoto.io/…"></textarea>
         </div>
+        <label class="check">
+          <input id="replace-existing" name="replace_existing" type="checkbox">
+          Replace cards already in the library
+        </label>
         <button class="primary" type="submit">Download</button>
       </form>
       <div id="job"></div>
@@ -350,7 +355,10 @@ async function startJob(event) {
     const job = await api("/api/jobs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ urls }),
+      body: JSON.stringify({
+        urls,
+        replace_existing: Boolean(event.target.replace_existing.checked),
+      }),
     });
     watchJob(job);
   } catch (error) {

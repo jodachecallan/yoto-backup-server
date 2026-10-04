@@ -131,6 +131,7 @@ class SettingsBody(BaseModel):
 
 class JobBody(BaseModel):
     urls: str
+    replace_existing: bool = False
 
 
 def _apply_event(job, event):
@@ -151,6 +152,12 @@ def _apply_event(job, event):
                 "url": event.get("url"),
                 "backup": event.get("backup"),
             })
+        elif event.get("status") == "skipped":
+            job["skipped"].append({
+                "cardId": event.get("cardId"),
+                "title": event.get("title") or event.get("cardId"),
+                "url": event.get("url"),
+            })
         else:
             job["failed"].append({
                 "url": event.get("url"),
@@ -158,7 +165,7 @@ def _apply_event(job, event):
             })
 
 
-def _run_job(job_id, urls):
+def _run_job(job_id, urls, replace_existing):
     global _active_job_id
     settings = config.load_config()
 
@@ -169,7 +176,13 @@ def _run_job(job_id, urls):
                 _apply_event(job, event)
 
     try:
-        extract_urls(urls, settings["library_dir"], settings["backup_dir"], on_event)
+        extract_urls(
+            urls,
+            settings["library_dir"],
+            settings["backup_dir"],
+            on_event,
+            replace_existing=replace_existing,
+        )
     except Exception as ex:
         on_event({"type": "log", "level": "error", "message": f"Download stopped: {ex}"})
     finally:
@@ -191,6 +204,7 @@ def _public_job(job):
         "currentUrl": job["currentUrl"],
         "logs": list(job["logs"]),
         "succeeded": list(job["succeeded"]),
+        "skipped": list(job.get("skipped") or []),
         "failed": list(job["failed"]),
     }
 
@@ -293,6 +307,7 @@ def start_job(body: JobBody):
             "currentUrl": "",
             "logs": [],
             "succeeded": [],
+            "skipped": [],
             "failed": [],
         }
         _jobs[job_id] = job
@@ -304,7 +319,11 @@ def start_job(body: JobBody):
         for item_id in finished[:-2]:
             _jobs.pop(item_id, None)
         public = _public_job(job)
-    thread = threading.Thread(target=_run_job, args=(job_id, urls), daemon=True)
+    thread = threading.Thread(
+        target=_run_job,
+        args=(job_id, urls, body.replace_existing),
+        daemon=True,
+    )
     thread.start()
     return public
 

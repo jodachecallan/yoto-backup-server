@@ -43,7 +43,7 @@ The app binds to `127.0.0.1`, starting at port 8765, and opens in your browser. 
 1. In **Settings**, set a library folder and a different backup folder. The defaults are `library/` and `backups/` next to the app.
 2. Read the card URL with the NXP TagInfo app ([App Store](https://apps.apple.com/es/app/nfc-taginfo-by-nxp/id1246143596), [Google Play](https://play.google.com/store/apps/details?id=com.nxp.taginfolite)): Scan & Launch, then hold the card to the phone.
 3. In **Add cards**, paste one or more URLs, one per line, and download.
-4. Each card is stored as `library/<card id>/` with `card.json`, the cover, `audio/`, and `images/`. A dated zip of that folder is written to the backup folder. Downloading the same card again replaces the library folder and writes a new zip.
+4. Each card is stored as `library/<card id>/` with `card.json`, the cover, `audio/`, and `images/`. A dated zip of that folder is written to the backup folder. Pasting a card that is already in the library skips it. Check **Replace cards already in the library** to download it again, replace the library folder, and write a new zip.
 5. `backups/recovery.json` stores the card id, title, and URL for every card saved, including cards whose library folder was later removed. Use that list to download the library again.
 
 ## Executable
