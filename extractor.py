@@ -432,9 +432,14 @@ def save_card(card, source_url, library_dir, backup_dir, on_event=None):
 
             audio_rel = None
             audio_url = track.get("trackUrl")
+            audio_response = None
             if audio_url:
-                audio_response = fetch_url(audio_url)
-                if audio_response.status_code == 200:
+                try:
+                    audio_response = fetch_url(audio_url)
+                except (TimeoutError, requests.RequestException) as ex:
+                    _log(on_event, "error", f"Failed to download track: {ex}")
+                    audio_response = None
+                if audio_response is not None and audio_response.status_code == 200:
                     content_type = audio_response.headers.get("content-type")
                     audio_ext = extension_from_content_type(content_type, AUDIO_EXTENSIONS)
                     if audio_ext not in audio_formats:
@@ -444,7 +449,7 @@ def save_card(card, source_url, library_dir, backup_dir, on_event=None):
                     with open(audio_path, "wb") as handle:
                         handle.write(audio_response.content)
                     audio_rel = os.path.join("audio", audio_name)
-                else:
+                elif audio_response is not None:
                     _log(
                         on_event,
                         "error",
