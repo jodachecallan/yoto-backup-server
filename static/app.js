@@ -5,6 +5,7 @@ const state = {
   page: "home",
   cardId: null,
   jobTimer: null,
+  audio: null,
   cards: [],
   query: "",
   author: "",
@@ -19,6 +20,7 @@ navButtons.forEach((button) => {
 });
 
 function show(page) {
+  stopPlayback();
   stopJobPoll();
   state.page = page;
   state.cardId = page === "library" ? state.cardId : null;
@@ -96,6 +98,39 @@ const ICON_AUDIO = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V6
 const ICON_CHECK = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 9.2 17 19 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const ICON_ALERT = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.5 3.5 19.5h17L12 4.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 10v4.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="16.8" r="0.8" fill="currentColor"/></svg>`;
 const ICON_SEARCH = `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16 16.5 20 20.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`;
+const ICON_PLAY = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6.2v11.6L18 12z" fill="currentColor"/></svg>`;
+const ICON_PAUSE = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 5.5h3v13h-3zM13.5 5.5h3v13h-3z" fill="currentColor"/></svg>`;
+const ICON_PREV = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 6v12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M17.5 6.8 9 12l8.5 5.2z" fill="currentColor"/></svg>`;
+const ICON_NEXT = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 6v12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M6.5 6.8 15 12 6.5 17.2z" fill="currentColor"/></svg>`;
+
+function stopPlayback() {
+  const audio = state.audio;
+  state.audio = null;
+  if (!audio) return;
+  audio.pause();
+  audio.removeAttribute("src");
+  audio.load();
+}
+
+function cardFileUrl(cardId, relative) {
+  const path = String(relative)
+    .replaceAll("\\", "/")
+    .split("/")
+    .filter(Boolean)
+    .map((part) => encodeURIComponent(part))
+    .join("/");
+  return `/api/cards/${encodeURIComponent(cardId)}/files/${path}`;
+}
+
+function formatClock(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+  const total = Math.floor(seconds);
+  const secs = total % 60;
+  const mins = Math.floor(total / 60) % 60;
+  const hours = Math.floor(total / 3600);
+  if (hours) return `${hours}:${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  return `${mins}:${String(secs).padStart(2, "0")}`;
+}
 
 function accentFor(category) {
   let total = 0;
@@ -256,11 +291,156 @@ async function loadLibrary() {
   }
 }
 
+function trackRow(track) {
+  const number = `<span class="num">${escapeHtml(track.number)}</span>`;
+  const title = `<span>${escapeHtml(track.title)}</span>`;
+  const duration = `<span class="muted">${escapeHtml(track.readableDuration || "")}</span>`;
+  return `${number}${title}${duration}`;
+}
+
+function startPlayer(card, playlist) {
+  const audio = new Audio();
+  audio.preload = "metadata";
+  audio.hidden = true;
+  state.audio = audio;
+  document.querySelector(".player").append(audio);
+  const title = document.querySelector("#player-title");
+  const status = document.querySelector("#player-status");
+  const toggle = document.querySelector("#player-toggle");
+  const prev = document.querySelector("#player-prev");
+  const next = document.querySelector("#player-next");
+  const range = document.querySelector("#player-range");
+  const current = document.querySelector("#player-current");
+  const duration = document.querySelector("#player-duration");
+  let index = -1;
+  let scrubbing = false;
+
+  function paintToggle() {
+    const playing = state.audio === audio && !audio.paused;
+    toggle.setAttribute("aria-label", playing ? "Pause" : "Play");
+    toggle.innerHTML = playing ? ICON_PAUSE : ICON_PLAY;
+  }
+
+  function playAudio() {
+    audio.play().catch((error) => {
+      if (error && error.name === "AbortError") return;
+      paintToggle();
+    });
+  }
+
+  function highlight() {
+    view.querySelectorAll(".track-play").forEach((row) => {
+      const on = Number(row.dataset.index) === index;
+      row.classList.toggle("is-current", on);
+      if (on) row.setAttribute("aria-current", "true");
+      else row.removeAttribute("aria-current");
+    });
+  }
+
+  function updateSkip() {
+    prev.disabled = index < 0;
+    next.disabled = index < 0 || index >= playlist.length - 1;
+  }
+
+  function playIndex(nextIndex) {
+    const track = playlist[nextIndex];
+    if (!track || state.audio !== audio) return;
+    if (nextIndex === index && audio.getAttribute("src")) {
+      playAudio();
+      return;
+    }
+    index = nextIndex;
+    status.textContent = "";
+    title.textContent = track.title || "Untitled";
+    current.textContent = "0:00";
+    range.value = "0";
+    const known = Number(track.duration);
+    if (Number.isFinite(known) && known > 0) {
+      range.max = String(known);
+      duration.textContent = formatClock(known);
+    } else {
+      range.max = "0";
+      duration.textContent = "0:00";
+    }
+    range.disabled = true;
+    highlight();
+    updateSkip();
+    audio.src = cardFileUrl(card.cardId, track.file);
+    playAudio();
+  }
+
+  audio.addEventListener("play", paintToggle);
+  audio.addEventListener("pause", paintToggle);
+  audio.addEventListener("loadedmetadata", () => {
+    if (state.audio !== audio) return;
+    const length = Number.isFinite(audio.duration) ? audio.duration : 0;
+    range.max = String(length);
+    range.disabled = length <= 0;
+    duration.textContent = formatClock(length);
+  });
+  audio.addEventListener("timeupdate", () => {
+    if (state.audio !== audio || scrubbing) return;
+    range.value = String(audio.currentTime || 0);
+    current.textContent = formatClock(audio.currentTime);
+  });
+  audio.addEventListener("ended", () => {
+    if (state.audio !== audio) return;
+    if (index < playlist.length - 1) playIndex(index + 1);
+    else paintToggle();
+  });
+  audio.addEventListener("error", () => {
+    if (state.audio !== audio) return;
+    status.textContent = "Could not play this track.";
+    paintToggle();
+  });
+
+  toggle.addEventListener("click", () => {
+    if (!playlist.length || state.audio !== audio) return;
+    if (index < 0) {
+      playIndex(0);
+      return;
+    }
+    if (audio.paused) playAudio();
+    else audio.pause();
+  });
+  prev.addEventListener("click", () => {
+    if (index < 0 || state.audio !== audio) return;
+    if (audio.currentTime > 3 || index === 0) {
+      audio.currentTime = 0;
+      range.value = "0";
+      current.textContent = "0:00";
+      return;
+    }
+    playIndex(index - 1);
+  });
+  next.addEventListener("click", () => {
+    if (state.audio !== audio || index >= playlist.length - 1) return;
+    playIndex(index + 1);
+  });
+  range.addEventListener("input", () => {
+    scrubbing = true;
+    const nextTime = Number(range.value);
+    current.textContent = formatClock(nextTime);
+    if (state.audio === audio && Number.isFinite(nextTime)) audio.currentTime = nextTime;
+  });
+  range.addEventListener("change", () => {
+    scrubbing = false;
+  });
+  range.addEventListener("pointerup", () => {
+    scrubbing = false;
+  });
+  view.querySelectorAll(".track-play").forEach((row) => {
+    row.addEventListener("click", () => playIndex(Number(row.dataset.index)));
+  });
+}
+
 async function openCard(cardId) {
+  stopPlayback();
   state.cardId = cardId;
   navButtons.forEach((button) => button.classList.remove("is-active"));
   try {
     const card = await api(`/api/cards/${encodeURIComponent(cardId)}`);
+    if (state.cardId !== cardId) return;
     const facts = [
       "Audio",
       card.author,
@@ -269,16 +449,18 @@ async function openCard(cardId) {
       card.trackCount ? `${card.trackCount} tracks` : "",
       (card.languages || []).join(", "),
     ].filter(Boolean);
+    const playlist = [];
     const tracks = (card.chapters || []).map((chapter) => {
       const heading = chapter.title ? `<li class="chapter-label">${escapeHtml(chapter.title)}</li>` : "";
-      const rows = (chapter.tracks || []).map((track) => `
-        <li>
-          <span class="num">${escapeHtml(track.number)}</span>
-          <span>${escapeHtml(track.title)}</span>
-          <span class="muted">${escapeHtml(track.readableDuration || "")}</span>
-        </li>`).join("");
+      const rows = (chapter.tracks || []).map((track) => {
+        if (!track.file) return `<li class="track-missing">${trackRow(track)}</li>`;
+        const index = playlist.length;
+        playlist.push(track);
+        return `<li><button type="button" class="track-play" data-index="${index}">${trackRow(track)}</button></li>`;
+      }).join("");
       return heading + rows;
     }).join("");
+    const playerTitle = playlist.length ? "Select a track" : "No audio on this card";
     view.innerHTML = `
       <button type="button" class="back" id="back">Back to library</button>
       <article class="detail-layout">
@@ -287,11 +469,27 @@ async function openCard(cardId) {
           <h2>${escapeHtml(card.title)}</h2>
           <div class="facts">${facts.map((fact) => `<span>${escapeHtml(fact)}</span>`).join("")}</div>
           ${card.description ? `<p class="description">${escapeHtml(card.description)}</p>` : ""}
+          <div class="player">
+            <p class="player-title" id="player-title">${escapeHtml(playerTitle)}</p>
+            <div class="player-transport">
+              <button type="button" class="player-btn" id="player-prev" aria-label="Previous track" disabled>${ICON_PREV}</button>
+              <button type="button" class="player-btn player-toggle" id="player-toggle" aria-label="Play"${playlist.length ? "" : " disabled"}>${ICON_PLAY}</button>
+              <button type="button" class="player-btn" id="player-next" aria-label="Next track" disabled>${ICON_NEXT}</button>
+            </div>
+            <div class="player-seek">
+              <span id="player-current">0:00</span>
+              <input id="player-range" type="range" min="0" max="0" value="0" step="0.1" aria-label="Seek" disabled>
+              <span id="player-duration">0:00</span>
+            </div>
+            <p class="player-status" id="player-status"></p>
+          </div>
           <ol class="tracks">${tracks}</ol>
         </div>
       </article>`;
     document.querySelector("#back").addEventListener("click", () => show("library"));
+    if (playlist.length) startPlayer(card, playlist);
   } catch (error) {
+    if (state.cardId !== cardId) return;
     view.innerHTML = `<p class="banner">${escapeHtml(error.message)}</p>`;
   }
 }
