@@ -420,6 +420,16 @@ textarea { min-height: 180px; resize: vertical; }
 
 .field { margin: 18px 0; }
 
+.check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  font-weight: 500;
+}
+
+.check input { width: auto; accent-color: var(--primary); }
+
 .primary {
   background: var(--primary);
   color: var(--text-primary);
@@ -474,6 +484,73 @@ textarea { min-height: 180px; resize: vertical; }
   font-size: 0.85rem;
 }
 
+.player {
+  max-width: 720px;
+  margin: 4px 0 8px;
+  padding: 16px 18px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+.player-title {
+  margin: 0 0 12px;
+  font-family: var(--display);
+  font-weight: 700;
+}
+
+.player-transport { display: flex; align-items: center; gap: 8px; }
+
+.player-btn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.player-btn svg { width: 18px; height: 18px; }
+
+.player-toggle {
+  width: 48px;
+  height: 48px;
+  background: var(--primary);
+}
+
+.player-btn:hover:not(:disabled) { background: var(--primary-hover); }
+
+.player-btn:disabled { opacity: 0.45; cursor: default; }
+
+.player-seek {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  margin-top: 12px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+}
+
+.player-seek span { min-width: 2.8rem; }
+.player-seek span:last-child { min-width: 2.8rem; text-align: right; }
+
+.player-seek input[type="range"] {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+.player-status { margin: 8px 0 0; color: var(--danger); font-size: 0.85rem; }
+
+.player-status:empty { display: none; }
+
 .tracks { list-style: none; margin: 8px 0 0; padding: 0; max-width: 720px; }
 
 .tracks li, .chapter-label {
@@ -484,6 +561,36 @@ textarea { min-height: 180px; resize: vertical; }
   padding: 11px 0;
   border-top: 1px solid var(--border);
 }
+
+.tracks li:has(.track-play) {
+  display: block;
+  padding: 0;
+}
+
+.tracks button.track-play {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr auto;
+  gap: 12px;
+  align-items: baseline;
+  width: 100%;
+  margin: 0;
+  padding: 11px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tracks button.track-play:hover { background: var(--surface-soft); }
+
+.tracks button.track-play.is-current {
+  background: var(--surface-soft);
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+
+.tracks li.track-missing { color: var(--text-secondary); }
 
 .tracks li.chapter-label {
   grid-template-columns: 1fr;
