@@ -34,31 +34,46 @@ function show(page) {
 }
 
 function loadHome() {
+  const mark = (path) => `<span class="step-mark" aria-hidden="true"><svg viewBox="0 0 24 24">${path}</svg></span>`;
   view.innerHTML = `
     <section class="home">
-      <h2>A backup of the Yoto cards you already own</h2>
-      <p class="lede">This page runs only on this computer. Paste a card’s Yoto URL and the app saves the cover, the audio, and the card details here, then writes a second copy you can keep somewhere else.</p>
+      <header class="home-intro">
+        <h2>YotoLib is a tool that lets you back up your Yoto cards</h2>
+        <p class="lede">Paste a card’s link and it saves the cover, the audio, and the card details on this computer. It also keeps a second copy you can store somewhere else. Only back up cards you legally own.</p>
+      </header>
       <ol class="steps">
         <li>
-          <strong>Get the card URL.</strong>
-          Read the card with a phone NFC app such as NXP TagInfo, then copy the link it shows.
+          ${mark('<path d="M10.2 13.2a4.2 4.2 0 0 0 6 .1l1.7-1.7a4.2 4.2 0 0 0-6-6L10.6 6.9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M13.8 10.8a4.2 4.2 0 0 0-6-.1l-1.7 1.7a4.2 4.2 0 0 0 6 6l1.3-1.3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>')}
+          <div class="step-copy">
+            <strong>Get the card’s link.</strong>
+            <p>Hold the card to your phone with an NFC app such as NXP TagInfo, then copy the link it shows.</p>
+          </div>
         </li>
         <li>
-          <strong>Add the cards.</strong>
-          Paste one or more URLs. Each card is stored in your library folder, with its cover, tracks, and <code>card.json</code>.
+          ${mark('<path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>')}
+          <div class="step-copy">
+            <strong>Add your cards.</strong>
+            <p>Paste one or more links. YotoLib saves each card in your library, with its cover, tracks, and <code>card.json</code>.</p>
+          </div>
         </li>
         <li>
-          <strong>Keep a second copy.</strong>
-          A zip of that card is written to your backup folder, separate from the library files.
+          ${mark('<rect x="8" y="8" width="11" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6 15V5.5A1.5 1.5 0 0 1 7.5 4H16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>')}
+          <div class="step-copy">
+            <strong>Keep a spare copy.</strong>
+            <p>A zip of that card goes in your backup folder, separate from the library files.</p>
+          </div>
         </li>
         <li>
-          <strong>Keep the recovery list.</strong>
-          <code>recovery.json</code> in the backup folder records the card id, title, and URL, so the cards can be downloaded again if the library files are lost.
+          ${mark('<path d="M8 7h9M8 12h9M8 17h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4.5 7h.01M4.5 12h.01M4.5 17h.01" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>')}
+          <div class="step-copy">
+            <strong>Keep a recovery list.</strong>
+            <p><code>recovery.json</code> in the backup folder remembers each card’s id, title, and link, so you can download them again if the library files are lost.</p>
+          </div>
         </li>
       </ol>
       <div class="home-actions">
-        <button type="button" class="primary" id="go-library">Open library</button>
-        <button type="button" class="ghost" id="go-add">Add cards</button>
+        <button type="button" class="primary" id="go-add">Add cards</button>
+        <button type="button" class="ghost" id="go-library">Open library</button>
       </div>
     </section>`;
   document.querySelector("#go-library").addEventListener("click", () => show("library"));
@@ -81,6 +96,24 @@ function escapeHtml(value) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+function termsMarkup() {
+  return `
+    <section class="terms" aria-labelledby="terms-heading">
+      <h3 id="terms-heading">Terms of use</h3>
+      <p>YotoLib saves a copy of your cards on this computer. Use it only for cards you legally own, or cards you already have permission to keep a copy of.</p>
+      <p>Before a download starts, you confirm that:</p>
+      <ul>
+        <li>You legally own every card you are downloading, or the owner has allowed you to keep a personal copy.</li>
+        <li>You will not use YotoLib to copy a card you do not have a right to store.</li>
+        <li>You will keep the saved audio, covers, and other files for yourself. You will not share, sell, or publish them unless you already have permission.</li>
+        <li>The audio, covers, artwork, and other card content belong to their owners. YotoLib does not give you any rights in that content.</li>
+        <li>Owning the physical card does not, by itself, mean a digital copy is allowed. You are responsible for making sure your copy is allowed.</li>
+        <li>YotoLib is not made by Yoto, and it is not affiliated with Yoto.</li>
+      </ul>
+      <p>The app is provided as is, with no warranty. The people who made it are not responsible for how you use it, for the card content, or for lost files.</p>
+    </section>`;
 }
 
 function coverMarkup(card, className) {
@@ -521,7 +554,7 @@ async function loadAdd() {
   view.innerHTML = `
     <section class="panel">
       <h2>Add cards</h2>
-      <p class="muted">Paste one or more Yoto URLs, one per line. Each card stays in your library, and a zip copy is written to the backup folder.</p>
+      <p class="muted">Paste one or more Yoto URLs, one per line. Each card stays in your library, and a zip copy is written to the backup folder. Only add cards you legally own, or cards you have permission to keep a copy of.</p>
       <form id="add-form">
         <div class="field">
           <label for="urls">Yoto URLs</label>
@@ -531,11 +564,20 @@ async function loadAdd() {
           <input id="replace-existing" name="replace_existing" type="checkbox">
           Replace cards already in the library
         </label>
+        <label class="check terms-check">
+          <input id="confirm-ownership" name="confirm_ownership" type="checkbox" required>
+          <span>I legally own these cards, or I have permission to keep a copy of them.</span>
+        </label>
+        <p class="terms-hint">The full terms are in <button type="button" class="text-link" id="read-terms">Settings</button>.</p>
         <button class="primary" type="submit">Download</button>
       </form>
       <div id="job"></div>
     </section>`;
   document.querySelector("#add-form").addEventListener("submit", startJob);
+  document.querySelector("#read-terms").addEventListener("click", () => {
+    show("settings");
+    document.querySelector("#terms-heading")?.scrollIntoView({ block: "start" });
+  });
   try {
     const current = await api("/api/jobs/current");
     if (current.status === "running") watchJob(current);
@@ -547,7 +589,11 @@ async function loadAdd() {
 async function startJob(event) {
   event.preventDefault();
   const urls = new FormData(event.target).get("urls") || "";
-  const button = event.target.querySelector("button");
+  if (!event.target.confirm_ownership.checked) {
+    document.querySelector("#job").innerHTML = `<p class="banner">Confirm that you legally own these cards, or have permission to keep a copy, before downloading.</p>`;
+    return;
+  }
+  const button = event.target.querySelector("button[type='submit']");
   button.disabled = true;
   try {
     const job = await api("/api/jobs", {
@@ -556,6 +602,7 @@ async function startJob(event) {
       body: JSON.stringify({
         urls,
         replace_existing: Boolean(event.target.replace_existing.checked),
+        confirm_ownership: true,
       }),
     });
     watchJob(job);
@@ -586,7 +633,7 @@ function paintJob(job) {
   slot.innerHTML = renderJob(job);
   const log = document.querySelector("#job-log");
   if (log) log.scrollTop = log.scrollHeight;
-  const button = document.querySelector("#add-form button");
+  const button = document.querySelector("#add-form button[type='submit']");
   if (button) button.disabled = job.status === "running";
 }
 
@@ -615,6 +662,7 @@ async function loadSettings() {
         <button class="primary" type="submit">Save settings</button>
       </form>
       <div id="settings-note"></div>
+      ${termsMarkup()}
     </section>`;
   const form = document.querySelector("#settings-form");
   try {

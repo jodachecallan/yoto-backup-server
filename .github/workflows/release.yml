@@ -109,8 +109,8 @@ jobs:
           pyinstaller --onefile ${{ matrix.icon_args }} \
             --add-data "static${{ matrix.data_sep }}static" \
             --collect-submodules uvicorn \
-            --name "yoto-backup-server_${{ steps.tag.outputs.tag }}${{ matrix.suffix }}" \
-            yoto-backup-server.py
+            --name "yotolib_${{ steps.tag.outputs.tag }}${{ matrix.suffix }}" \
+            yotolib.py
 
       - name: Package as tar.gz (Linux only)
         # A bare Unix executable with no extension is normal (ls, git,
@@ -123,7 +123,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         shell: bash
         run: |
-          name="yoto-backup-server_${{ steps.tag.outputs.tag }}${{ matrix.suffix }}"
+          name="yotolib_${{ steps.tag.outputs.tag }}${{ matrix.suffix }}"
           chmod +x "dist/$name"
           tar -czf "dist/$name.tar.gz" -C dist "$name"
 
@@ -133,7 +133,7 @@ jobs:
         shell: bash
         run: |
           gh release upload "${{ steps.tag.outputs.tag }}" \
-            "dist/yoto-backup-server_${{ steps.tag.outputs.tag }}${{ matrix.suffix }}${{ matrix.ext }}" \
+            "dist/yotolib_${{ steps.tag.outputs.tag }}${{ matrix.suffix }}${{ matrix.ext }}" \
             --repo "${{ github.repository }}" \
             --clobber
 
@@ -173,26 +173,26 @@ jobs:
           pyinstaller --windowed \
             --add-data "static:static" \
             --collect-submodules uvicorn \
-            --name "Yoto Backup" \
-            yoto-backup-server.py
+            --name "YotoLib" \
+            yotolib.py
 
       - name: Package .dmg
         run: |
-          app="dist/Yoto Backup.app"
+          app="dist/YotoLib.app"
           staging="dmg_staging"
           mkdir "$staging"
           cp -R "$app" "$staging/"
           ln -s /Applications "$staging/Applications"
-          hdiutil create -volname "Yoto Backup" \
+          hdiutil create -volname "YotoLib" \
             -srcfolder "$staging" \
             -ov -format UDZO \
-            "dist/yoto-backup-server_${{ steps.tag.outputs.tag }}_macos.dmg"
+            "dist/yotolib_${{ steps.tag.outputs.tag }}_macos.dmg"
 
       - name: Upload .dmg to the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload "${{ steps.tag.outputs.tag }}" \
-            "dist/yoto-backup-server_${{ steps.tag.outputs.tag }}_macos.dmg" \
+            "dist/yotolib_${{ steps.tag.outputs.tag }}_macos.dmg" \
             --repo "${{ github.repository }}" \
             --clobber
