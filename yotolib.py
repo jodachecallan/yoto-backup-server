@@ -1,4 +1,4 @@
-"""Start the local Yoto library and open it in a browser."""
+"""Start YotoLib and open it in a browser."""
 
 import socket
 import sys
@@ -31,7 +31,7 @@ def main():
 
     port = pick_port()
     url = f"http://{HOST}:{port}"
-    print(f"Yoto library at {url}")
+    print(f"YotoLib at {url}")
     print("Close this window to stop the app.")
 
     def open_browser():

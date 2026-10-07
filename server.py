@@ -132,6 +132,7 @@ class SettingsBody(BaseModel):
 class JobBody(BaseModel):
     urls: str
     replace_existing: bool = False
+    confirm_ownership: bool = False
 
 
 def _apply_event(job, event):
@@ -221,7 +222,7 @@ async def lifespan(_app):
     yield
 
 
-app = FastAPI(title="Yoto Library", lifespan=lifespan)
+app = FastAPI(title="YotoLib", lifespan=lifespan)
 
 
 @app.get("/api/settings")
@@ -292,6 +293,11 @@ def read_job(job_id: str):
 @app.post("/api/jobs")
 def start_job(body: JobBody):
     global _active_job_id
+    if not body.confirm_ownership:
+        raise HTTPException(
+            status_code=400,
+            detail="Confirm that you legally own these cards, or have permission to keep a copy, before downloading.",
+        )
     urls = [line.strip() for line in body.urls.splitlines() if line.strip()]
     if not urls:
         raise HTTPException(status_code=400, detail="Paste at least one URL.")
